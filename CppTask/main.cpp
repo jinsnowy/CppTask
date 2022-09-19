@@ -1,76 +1,64 @@
 #include "task.h"
-#include "single_worker.h"
-#include "async_worker.h"
+#include <set>
+#include <chrono>
 
-using namespace CppTask;
 using namespace std;
+using namespace tpl;
+using namespace chrono_literals;
 
-class TestClass
-{
-public:
-    TestClass() = default;
-    ~TestClass() = default;
-
-    TestClass(const TestClass& tc) { cout << "copy construct" << endl; }
-    TestClass& operator=(const TestClass&) { cout << "assign construct" << endl; return *this; }
-
-    TestClass(TestClass&& tc) noexcept { cout << "move construct" << endl; }
-    TestClass& operator=(TestClass&& tc) noexcept { cout << "move assign" << endl; return *this; }
-};
-
-class B;
-class A
-{
-public:
-    void func(const int& a) { cout << "Member Function" << endl; }
-    void func_const(int a) const { cout << "Const Member Function" << endl; }
-    void func_class(const B* b) { cout << "Member Function Complex" << endl; };
-    void func_move_class(TestClass&& tc) { cout << "Member Function With Move" << endl; }
-};
-
-class B : public A { };
-
-void func() { cout << "static function" << endl; }
+int test_num = 512;
 
 void test1();
-void test2();
 
 int main()
 {
-    test1();
-    test2();
-
+	test1();
 
 	return 0;
 }
 
 void test1()
 {
-    A a;
-    TestClass tc;
+	auto t1 = make_task([]() { cout << "hello world" << endl; });
+	t1.start();
+	t1.wait();
 
-	auto& worker = single_worker::get();
-    single_worker::get().start();
+	try {
+		t1.start();
+	}
+	catch (std::exception e) {
+		cout << e.what() << endl;
+	}
 
-    worker.push_task(func);
-    worker.push_task([]() { for (int i = 0; i < 5; ++i) { cout << "task " << i << endl; std::this_thread::sleep_for(std::chrono::milliseconds(500)); }});
-    worker.push_task(&A::func_move_class, &a, std::move(tc));
+	int a = 1, b = 2;
+	auto t2 = make_task([](int a, int b) { return a + b; }, a, b);
+	// auto t2 = make_task([a, b]() { return a + b; });
+	t2.start();
 
-    single_worker::get().wait_all();
-}
+	auto r2 = t2.result();
+	cout << "second result : " << r2 << endl;
 
-void test2()
-{
-    srand(time(NULL));
-    int arr[10] = {};
-    for (int i = 0; i < 10; ++i) arr[i] = (i+1);
+	auto t3 = run_async([]() { return "hello world"; });
+	auto awaiter = t3.get_awaiter();
+	auto r3 = awaiter.get_result();
 
-    auto l = [](int&& r) { return r * r; };
+	cout << "third result : " << r3 << endl;
 
-    constexpr bool b3 = std::is_assignable_v<std::tuple<int>, typename function_traits<decltype(l)>::FArgsType>;
+	bool always = true;
+	auto t4 = run_async([always]() { 
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		if (always)
+		{
+			throw std::exception("noop");
+		}
+	
+		return 10; 
+	});
 
-    auto& worker = async_worker::get();
-    auto awaiter1 = worker.push_task([arr]() -> int { cout << "first task" << endl; return arr[rand()%10]; });
-    auto awaiter2 = awaiter1.continue_with([](int r) -> int { cout << "second task num choose = " << r << endl;  return r; });
-    cout << "result : " << awaiter2.get() << endl;
+	try {
+		auto r4 = t4.result();
+	}
+	catch (const std::exception& e) {
+		cout << e.what() << endl;
+	}
 }

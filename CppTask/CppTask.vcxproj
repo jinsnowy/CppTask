@@ -140,12 +140,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="task.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="async_worker.h" />
-    <ClInclude Include="single_worker.h" />
     <ClInclude Include="task.h" />
+    <ClInclude Include="function_traits.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,0 +1,14 @@
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\bin\Debug\netcoreapp3.1\CSharpTask.exe
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\bin\Debug\netcoreapp3.1\CSharpTask.deps.json
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\bin\Debug\netcoreapp3.1\CSharpTask.runtimeconfig.json
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\bin\Debug\netcoreapp3.1\CSharpTask.runtimeconfig.dev.json
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\bin\Debug\netcoreapp3.1\CSharpTask.dll
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\bin\Debug\netcoreapp3.1\CSharpTask.pdb
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.csproj.AssemblyReference.cache
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.AssemblyInfoInputs.cache
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.AssemblyInfo.cs
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.csproj.CoreCompileInputs.cache
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.dll
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.pdb
+C:\Users\yhjin\Desktop\CppProject\CppTask\CSharpTask\obj\Debug\netcoreapp3.1\CSharpTask.genruntimeconfig.cache
