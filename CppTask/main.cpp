@@ -9,10 +9,12 @@ using namespace chrono_literals;
 int test_num = 512;
 
 void test1();
+void test2();
 
 int main()
 {
 	test1();
+	test2();
 
 	return 0;
 }
@@ -35,7 +37,7 @@ void test1()
 	// auto t2 = make_task([a, b]() { return a + b; });
 	t2.start();
 
-	auto r2 = t2.result();
+	auto r2 = t2.get();
 	cout << "second result : " << r2 << endl;
 
 	auto t3 = run_async([]() { return "hello world"; });
@@ -56,9 +58,49 @@ void test1()
 	});
 
 	try {
-		auto r4 = t4.result();
+		auto r4 = t4.get();
 	}
 	catch (const std::exception& e) {
 		cout << e.what() << endl;
 	}
+}
+
+void test2()
+{
+	auto t1 = run_async([]() {
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+		throw std::exception("noop");
+	});
+
+	auto t2 = t1.then([](task<void>& t) {
+		if (t.is_faulted())
+		{
+			cout << "previous task was faulted by exception" << endl;
+		}
+		else {
+			cout << "not faulted by exception" << endl;
+		}
+	});
+
+	auto cancel_source = cancellation_token_source{};
+	auto cancel_token = cancel_source.token();
+	auto t3 = t2.then([cancel_token](task<void>& t) {
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+		if (cancel_token.is_cancellation_requested()) {
+			cancel_token.throw_if_cancellation_requested();
+		}
+	});
+	cancel_source.cancel();
+
+	auto t4 = t3.then([](task<void>& t) {
+		if (t.is_canceled())
+		{
+			cout << "previous task was canceled" << endl;
+		}
+		else {
+			cout << "not canceled" << endl;
+		}
+	});
+
+	t4.wait();
 }

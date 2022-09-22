@@ -1,4 +1,6 @@
 #pragma once
+#include <tuple>
+#include <type_traits>
 
 namespace tpl
 {
@@ -75,13 +77,25 @@ namespace tpl
         using type = std::remove_reference_t<std::remove_cv_t<T>>;
     };
 
+    template<typename ...Args>
+    struct decay_tuple_type
+    {
+        using type = std::tuple<Args...>;
+    };
+
+    template<typename ...Args>
+    struct decay_tuple_type<std::tuple<Args...>>
+    {
+        using type = std::tuple<std::decay_t<Args>...>;
+    };
+
     template<typename T>
     using gen_param_type_t = typename gen_param_type<T>::type;
 
     template<typename F, typename ...Args>
     struct gen_task_type
     {
-        using Return = typename function_traits<std::decay_t<F>>::ReturnType;
+        using Return = std::decay_t<typename function_traits<std::decay_t<F>>::ReturnType>;
         using FArgs = typename function_traits<std::decay_t<F>>::FArgsType;
         using Func = typename gen_func_type<Return, FArgs>::type;
         using Tuple = std::tuple<gen_param_type_t<Args>...>;
