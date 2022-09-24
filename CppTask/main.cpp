@@ -10,25 +10,26 @@ int test_num = 512;
 
 void test1();
 void test2();
+void test3();
 
 int main()
 {
-	test1();
-	test2();
+	//test1();
+	//test2();
+	test3();
 
 	return 0;
 }
 
 void test1()
 {
-	auto t1 = make_task([]() { cout << "hello world" << endl; });
+	auto t1 = make_task([]() { cout << "hello world" << endl; throw std::exception("noop"); });
 	t1.start();
-	t1.wait();
 
 	try {
-		t1.start();
+		t1.wait();
 	}
-	catch (std::exception e) {
+	catch (const std::exception& e) {
 		cout << e.what() << endl;
 	}
 
@@ -101,4 +102,19 @@ void test2()
 	});
 
 	t4.wait();
+}
+
+void test3()
+{
+	auto e1 = run_async([]() { cout << "first task starts" << endl; throw std::exception("my exception"); });
+	auto v1 = e1.then([](task<void>& t) {
+		if (t.is_faulted()) {
+			const auto& ex = t.exception();
+			for (const auto& e : ex) {
+				cout << e.what() << endl;
+			}
+		}
+	});
+
+	v1.wait();
 }

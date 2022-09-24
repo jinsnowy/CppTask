@@ -101,13 +101,13 @@ var t1 = Task.Run(async () =>
 2. continue with the other task
 ```cpp
 auto t2 = t1.then([](task<void>& t) {
-	if (t.is_faulted())
-	{
-		cout << "previous task was faulted by exception" << endl;
-	}
-	else {
-		cout << "not faulted by exception" << endl;
-	}
+    if (t.is_faulted())
+    {
+	    cout << "previous task was faulted by exception" << endl;
+    }
+    else {
+	    cout << "not faulted by exception" << endl;
+    }
 });
 ```
 ```csharp
@@ -126,11 +126,11 @@ var t2 = t1.ContinueWith((t) =>
 3. cancel a task
 ```cpp
 auto cancel_source = cancellation_token_source{};
-	auto cancel_token = cancel_source.token();
-	auto t3 = t2.then([cancel_token](task<void>& t) {
-		std::this_thread::sleep_for(std::chrono::seconds(2));
-		cancel_token.throw_if_cancellation_requested();
-	});
+auto cancel_token = cancel_source.token();
+auto t3 = t2.then([cancel_token](task<void>& t) {
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	cancel_token.throw_if_cancellation_requested();
+});
 cancel_source.cancel();
 ```
 ```csharp

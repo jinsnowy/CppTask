@@ -46,12 +46,43 @@ namespace cpptask
 		faulted,
 	};
 
-	class TaskCanceled : public std::exception {
+	class task_cancelled : public std::exception {
 	public:
-		TaskCanceled() = default;
+		task_cancelled() = default;
 
 		const char* what() const override {
 			return "a task was cancelled";
+		}
+	};
+	
+	class aggregate_exception : public std::exception {
+		template<typename T>
+		friend class dispatch_block;
+	private:
+		std::vector<std::exception> inner_exceptions;
+
+	public:
+		auto begin() { return inner_exceptions.begin(); }
+		auto begin() const { return inner_exceptions.begin(); }
+		auto end() { return inner_exceptions.end(); }
+		auto end() const { return inner_exceptions.end(); }
+
+		size_t size() const { return inner_exceptions.size(); }
+
+		aggregate_exception() = default;
+
+		const char* what() const override {
+			return "aggregate exception";
+		}
+
+		void add_exception(const std::exception& e) {
+			inner_exceptions.push_back(e);
+		}
+
+		void add_exception(const aggregate_exception& es) {
+			for (const auto& e : es) {
+				inner_exceptions.push_back(e);
+			}
 		}
 	};
 
@@ -72,7 +103,7 @@ namespace cpptask
 
 		bool is_cancellation_requested() const { if (block == nullptr) return false; return block->canceled; }
 
-		void throw_if_cancellation_requested() const { if (block != nullptr && block->canceled) throw TaskCanceled(); }
+		void throw_if_cancellation_requested() const { if (block != nullptr && block->canceled) throw task_cancelled(); }
 	};
 
 	class cancellation_token_source {
@@ -100,20 +131,50 @@ namespace cpptask
 	class task;
 
 	struct task_t {
+		virtual void wait() = 0;
+
 		virtual void dispatch() = 0;
 	};
 
 	class child_disaptch_block {
 	private:
+		struct one_time_event {
+			std::promise<void> p;
+			std::future<void> f;
+
+			one_time_event() : f(p.get_future()) {}
+
+			void set() { p.set_value(); }
+			void wait() { f.wait(); }
+		};
 		bool dispatched;
 		std::mutex mtx;
 		std::vector<std::unique_ptr<task_t>> childs;
+		std::unique_ptr<one_time_event> child_would_dispatch;
 
-	public:
-		child_disaptch_block()
+	protected:
+		bool is_self_child;
+
+		child_disaptch_block(bool child)
 			:
+			is_self_child(child),
 			dispatched(false)
 		{
+			if (is_self_child) {
+				child_would_dispatch = std::make_unique<one_time_event>();
+			}
+		}
+
+		void wait_if_is_self_child() {
+			if (child_would_dispatch) {
+				child_would_dispatch->wait();
+			}
+		}
+
+		void dispatched_if_is_self_child() {
+			if (child_would_dispatch) {
+				child_would_dispatch->set();
+			}
 		}
 
 		template<typename T>
@@ -147,9 +208,9 @@ namespace cpptask
 		friend class task<T>;
 		friend class task_awaiter<T>;
 	private:
-		bool child;
 		task_status	status;
 		cancellation_token cancel_token;
+		std::shared_ptr<aggregate_exception> exception_ptr;
 
 		std::atomic<bool> dispatch_once;
 		std::future<void> dispatch_token;
@@ -158,17 +219,64 @@ namespace cpptask
 		std::future<T> result_token;
 
 	public:
-		dispatch_block(const cancellation_token& token, const bool& child_in) : child(child_in), status(created), cancel_token(token), dispatch_once(false), result_token_setter{}, result_token(result_token_setter.get_future()) {}
+		dispatch_block(const cancellation_token& token, const bool& child_in) 
+			: 
+			child_disaptch_block(child_in),
+			status(created),
+			cancel_token(token),
+			dispatch_once(false),
+			result_token_setter{},
+			result_token(result_token_setter.get_future()),
+			exception_ptr(nullptr)
+		{}
+
 		dispatch_block(const bool& child_in) : dispatch_block(cancellation_token{}, child_in) {}
 		dispatch_block() : dispatch_block(false) {}
 
-		bool is_child() const { return child; }
+		void add_exception(const std::exception& e) {
+			if (exception_ptr == nullptr) {
+				exception_ptr = std::make_shared<aggregate_exception>();
+			}
+			exception_ptr->add_exception(e);
+		}
+
+		void add_exception(const aggregate_exception& e) {
+			if (exception_ptr == nullptr) {
+				exception_ptr = std::make_shared<aggregate_exception>();
+			}
+			exception_ptr->add_exception(e);
+		}
+
+		bool has_exception() const {
+			if (exception_ptr != nullptr) {
+				return exception_ptr->size() != 0;
+			}
+			return false;
+		}
+
+		const aggregate_exception& exception() const {
+			if (exception_ptr == nullptr) {
+				const static aggregate_exception empty;
+				return empty;
+			}
+
+			return *exception_ptr;
+		}
+
+		bool is_child() const { return is_self_child; }
 
 		bool is_canceled() const { return cancel_token.is_cancellation_requested(); }
 
-		bool is_dispatchable() { bool expected = false; return dispatch_once.compare_exchange_strong(expected, true); }
+		bool is_dispatchable() { 
+			bool expected = false; 
+			return dispatch_once.compare_exchange_strong(expected, true); 
+		}
 
-		void set_dispatched(std::future<void>&& dispatch_token_in) { status = running; dispatch_token = std::move(dispatch_token_in); }
+		void set_dispatched(std::future<void>&& dispatch_token_in) {
+			status = running;
+			dispatch_token = std::move(dispatch_token_in);
+			dispatched_if_is_self_child();
+		}
 	};
 
 	template<typename T>
@@ -234,10 +342,15 @@ namespace cpptask
 		}
 
 	public:
+		const aggregate_exception& exception() const {
+			return signal->exception();
+		}
+
 		virtual void operator()() = 0;
 
-		void wait() {
-			signal->result_token.wait();
+		virtual void wait() override {
+			signal->wait_if_is_self_child();
+			signal->dispatch_token.wait();
 		}
 
 		bool is_canceled() const { return signal->status == canceled; }
@@ -264,27 +377,33 @@ namespace cpptask
 		{}
 
 		virtual void operator()() override {
-
 			auto& signal_obj = task_base<T>::signal;
 			try {
 				if (signal_obj->is_canceled()) {
-					throw TaskCanceled();
+					throw task_cancelled();
 				}
 				else {
 					T&& value = (*task_base<T>::callable)();
 					if (signal_obj->is_canceled()) {
-						throw TaskCanceled();
+						throw task_cancelled();
 					}
 
 					signal_obj->status = completed;
 					signal_obj->result_token_setter.set_value(std::forward<T>(value));
 				}
 			}
-			catch (const TaskCanceled&) {
+			catch (const task_cancelled& e) {
+				signal_obj->add_exception(e);
 				signal_obj->status = canceled;
 				signal_obj->result_token_setter.set_exception(std::current_exception());
 			}
-			catch (const std::exception&) {
+			catch (const aggregate_exception& e) {
+				signal_obj->add_exception(e);
+				signal_obj->status = faulted;
+				signal_obj->result_token_setter.set_exception(std::current_exception());
+			}
+			catch (const std::exception& e) {
+				signal_obj->add_exception(e);
 				signal_obj->status = faulted;
 				signal_obj->result_token_setter.set_exception(std::current_exception());
 			}
@@ -296,6 +415,9 @@ namespace cpptask
 			if (task_base<T>::signal->is_dispatchable()) {
 				task_base<T>::signal->set_dispatched(std::async(std::launch::async, [task_obj = *this]() mutable { (task_obj)(); }));
 			}
+			else {
+				throw std::exception("task is already started");
+			}
 		}
 
 		void start() {
@@ -305,7 +427,7 @@ namespace cpptask
 
 		template<typename F, typename R = std::decay_t<typename function_traits<std::decay_t<F>>::ReturnType>,
 			typename = std::enable_if_t<std::is_same_v<typename decay_tuple_type<typename function_traits<std::decay_t<F>>::FArgsType>::type, std::tuple<task<T>>>>>
-			task<R> then(F&& fIn);
+		task<R> then(F&& fIn);
 
 		T get() { return task_base<T>::signal->result_token.get(); }
 	};
@@ -324,23 +446,30 @@ namespace cpptask
 			auto& signal_obj = task_base<void>::signal;
 			try {
 				if (signal_obj->is_canceled()) {
-					throw TaskCanceled();
+					throw task_cancelled();
 				}
 				else {
 					(*task_base<void>::callable)();
 					if (signal_obj->is_canceled()) {
-						throw TaskCanceled();
+						throw task_cancelled();
 					}
 
 					signal_obj->status = completed;
 					signal_obj->result_token_setter.set_value();
 				}
 			}
-			catch (const TaskCanceled&) {
+			catch (const task_cancelled& e) {
+				signal_obj->add_exception(e);
 				signal_obj->status = canceled;
 				signal_obj->result_token_setter.set_exception(std::current_exception());
 			}
-			catch (const std::exception&) {
+			catch (const aggregate_exception& e) {
+				signal_obj->add_exception(e);
+				signal_obj->status = faulted;
+				signal_obj->result_token_setter.set_exception(std::current_exception());
+			}
+			catch (const std::exception& e) {
+				signal_obj->add_exception(e);
 				signal_obj->status = faulted;
 				signal_obj->result_token_setter.set_exception(std::current_exception());
 			}
@@ -351,6 +480,8 @@ namespace cpptask
 		virtual void dispatch() override {
 			if (task_base<void>::signal->is_dispatchable()) {
 				task_base<void>::signal->set_dispatched(std::async(std::launch::async, [task_obj = *this]() mutable { (task_obj)(); }));
+			} else {
+				throw std::exception("task is already started");
 			}
 		}
 
@@ -404,7 +535,7 @@ namespace cpptask
 	task<R> task<T>::then(F&& fIn)
 	{
 		auto entangled = [f = std::forward<F>(fIn), task_obj = *this]() mutable {
-			task_obj.signal->dispatch_token.wait();
+			task_obj.wait();
 			return f(task_obj);
 		};
 
@@ -421,7 +552,7 @@ namespace cpptask
 	task<R> task<void>::then(F&& fIn)
 	{
 		auto entangled = [f = std::forward<F>(fIn), task_obj = *this]() mutable {
-			task_obj.signal->dispatch_token.wait();
+			task_obj.wait();
 			return f(task_obj);
 		};
 
@@ -433,5 +564,4 @@ namespace cpptask
 
 		return child_task;
 	}
-
 }

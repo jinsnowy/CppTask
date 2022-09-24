@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace CSharpTask
 {
@@ -8,8 +9,9 @@ namespace CSharpTask
     {
         static void Main(string[] args)
         {
-            Test1();
-            Test2();
+            //Test1();
+            //Test2();
+            Test3();
         }
 
         static void Test1()
@@ -107,6 +109,52 @@ namespace CSharpTask
             });
 
             t4.Wait();
+        }
+
+
+        static void Test3()
+        {
+            var t1 = Task.Run(() => { Console.WriteLine("first task starts"); });
+            var t2 = Task.Run(() => { Console.WriteLine("second task starts"); });
+            var t3 = Task.Run(() => { Console.WriteLine("third task starts"); });
+
+            Task[] tasks = { t1, t2, t3 };
+
+            Task t_all = Task.WhenAll(tasks);
+            t_all.Wait();
+
+            var tasks2 = new List<Task>();
+            tasks2.Add(Task.Run(() => { throw new ArgumentException(); }));
+            tasks2.Add(Task.Run(() => { throw new InvalidOperationException(); }));
+            tasks2.Add(Task.Run(() => { throw new ObjectDisposedException("object"); }));
+
+            Task t_all2 = Task.WhenAll(tasks2);
+            try
+            {
+                t_all2.Wait();                
+            } 
+            catch (AggregateException es)
+            {
+                foreach (var e in es.InnerExceptions)
+                {
+                    Console.WriteLine($"{e.GetType().Name}");
+                }
+            }
+
+            var e1 = Task.Run(() => { Console.WriteLine("first task starts"); throw new Exception("my exception"); });
+            var v1 = e1.ContinueWith(t => 
+            {
+                if (t.IsFaulted)
+                {
+                    var ex = t.Exception;
+                    foreach (var e in ex?.InnerExceptions)
+                    {
+                        Console.WriteLine($"{e.GetType().Name}");
+                    }
+                }
+            });
+
+            v1.Wait();
         }
     }
 }
