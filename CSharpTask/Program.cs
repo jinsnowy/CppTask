@@ -34,7 +34,16 @@ namespace CSharpTask
             Console.WriteLine($"third result : {r3}" );
 
             bool always = true;
-            var t4 = Task.Run(() => { Thread.Sleep(1000); if (always) throw new InvalidProgramException("noop"); return 10; });
+            var t4 = Task.Run(() => 
+            { 
+                Thread.Sleep(1000);
+                if (always)
+                {
+                    throw new InvalidProgramException("noop");
+                }
+                 
+                return 10; 
+            });
 
             try
             {
