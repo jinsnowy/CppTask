@@ -86,9 +86,7 @@ void test2()
 	auto cancel_token = cancel_source.token();
 	auto t3 = t2.then([cancel_token](task<void>& t) {
 		std::this_thread::sleep_for(std::chrono::seconds(2));
-		if (cancel_token.is_cancellation_requested()) {
-			cancel_token.throw_if_cancellation_requested();
-		}
+		cancel_token.throw_if_cancellation_requested();
 	});
 	cancel_source.cancel();
 
