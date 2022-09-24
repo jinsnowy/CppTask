@@ -1,11 +1,10 @@
 # CppTask
+### C++ implemented Task Base Programming
+- C++ task class like C# (might be considered as other languages' task class)
 
-## C++ Task Base Programming
 
-make C++ task class like C# or other languages' task class
-
-- example
-1. Task Start and Wait
+### Create Task, Start and Wait The Task
+1. start task and wait
 ```cpp
 auto t1 = make_task([]() { cout << "hello world" << endl; });
 t1.start();
