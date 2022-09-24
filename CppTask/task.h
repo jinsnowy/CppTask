@@ -9,7 +9,7 @@
 
 #include "function_traits.h"
 
-namespace tpl
+namespace cpptask
 {
 	template<typename F, typename ...Args>
 	struct func_wrapper : callable_t<typename gen_task_type<F, Args...>::Return>

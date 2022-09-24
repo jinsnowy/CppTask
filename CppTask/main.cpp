@@ -3,7 +3,7 @@
 #include <chrono>
 
 using namespace std;
-using namespace tpl;
+using namespace cpptask;
 using namespace chrono_literals;
 
 int test_num = 512;
